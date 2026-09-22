@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InterNetRadio</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        [data-bs-theme="light"] {
+            --primary-gradient: linear-gradient(135deg, #e0c3fc, #8ec5fc);
+            --glass-bg: rgba(255, 255, 255, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--primary-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--bs-body-color);
+            transition: background 0.5s ease, color 0.3s ease;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .equalizer {
+            display: flex;
+            align-items: flex-end;
+            height: 40px;
+            gap: 4px;
+        }
+        .bar {
+            width: 6px;
+            background: var(--bs-primary);
+            border-radius: 3px;
+            animation: equalize 1s ease-in-out infinite;
+        }
+        .bar:nth-child(1) { animation-duration: 0.8s; height: 20%; }
+        .bar:nth-child(2) { animation-duration: 1.1s; height: 60%; }
+        .bar:nth-child(3) { animation-duration: 0.9s; height: 40%; }
+        .bar:nth-child(4) { animation-duration: 1.2s; height: 80%; }
+        .bar:nth-child(5) { animation-duration: 0.7s; height: 30%; }
+        
+        @keyframes equalize {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(1.8); }
+        }
+        .equalizer.paused .bar {
+            animation-play-state: paused;
+            height: 15% !important;
+            transition: height 0.4s ease;
+        }
+
+        .station-item {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 12px !important;
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .station-item:hover {
+            background: rgba(var(--bs-primary-rgb), 0.1);
+            transform: translateX(4px);
+            border-color: rgba(var(--bs-primary-rgb), 0.3);
+        }
+        .station-item.active {
+            background: rgba(var(--bs-primary-rgb), 0.15);
+            border-color: var(--bs-primary);
+        }
+
+        .btn-glass {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: inherit;
+            transition: all 0.2s;
+        }
+        .btn-glass:hover {
+            background: rgba(255,255,255,0.15);
+            color: inherit;
+        }
+        .play-btn {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: var(--bs-primary);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 25px rgba(var(--bs-primary-rgb), 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .play-btn:hover:not(:disabled) {
+            transform: scale(1.08);
+            box-shadow: 0 12px 30px rgba(var(--bs-primary-rgb), 0.5);
+        }
+        .play-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        /* Кастомный скроллбар */
+        .station-list::-webkit-scrollbar { width: 6px; }
+        .station-list::-webkit-scrollbar-track { background: transparent; }
+        .station-list::-webkit-scrollbar-thumb {
+            background: rgba(var(--bs-primary-rgb), 0.3);
+            border-radius: 3px;
+        }
+        .station-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(var(--bs-primary-rgb), 0.5);
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="container py-4 py-md-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 col-12">
+
+            <div class="glass-card p-4 p-md-5">
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="fw-bold mb-0 d-flex align-items-center">
+                        <i class="bi bi-broadcast me-2 text-primary"></i>InterNetRadio
+                    </h4>
+                    <button class="btn btn-glass rounded-circle d-flex align-items-center justify-content-center" 
+                            style="width: 42px; height: 42px;" 
+                            @click="toggleTheme" 
+                            :title="theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'">
+                        <i class="bi" :class="theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-fill'"></i>
+                    </button>
+                </div>
+
+                <div class="text-center mb-4">
+                    <div class="equalizer mb-3 justify-content-center" :class="{ paused: !isPlaying }">
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                        <div class="bar"></div><div class="bar"></div>
+                    </div>
+                    <h3 class="fw-bold mb-2 text-truncate px-2" style="min-height: 2.5rem;">
+                        {{ currentStation?.name || 'Выберите станцию' }}
+                    </h3>
+                    <span v-if="currentStation" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 px-3 py-2">
+                        <i class="bi bi-broadcast me-1"></i> LIVE STREAM
+                    </span>
+                    <span v-else class="text-muted small">Ожидание запуска...</span>
+                </div>
+
+                <div class="d-flex justify-content-center align-items-center gap-4 mb-4">
+                    <button class="btn btn-glass rounded-circle d-flex align-items-center justify-content-center" 
+                            style="width: 52px; height: 52px;" 
+                            @click="prevStation" 
+                            :disabled="stations.length < 2"
+                            title="Предыдущая (←)">
+                        <i class="bi bi-skip-start-fill fs-5"></i>
+                    </button>
+                    
+                    <button class="play-btn" 
+                            @click="togglePlayPause" 
+                            :disabled="isLoading || stations.length === 0"
+                            title="Play/Pause (Пробел)">
+                        <i class="bi" :class="isPlaying ? 'bi-pause-fill' : 'bi-play-fill'"></i>
+                    </button>
+                    
+                    <button class="btn btn-glass rounded-circle d-flex align-items-center justify-content-center" 
+                            style="width: 52px; height: 52px;" 
+                            @click="nextStation" 
+                            :disabled="stations.length < 2"
+                            title="Следующая (→)">
+                        <i class="bi bi-skip-end-fill fs-5"></i>
+                    </button>
+                </div>
+
+                <div class="row g-3 mb-4 align-items-center">
+                    <div class="col-7">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi fs-5" :class="volumeIcon"></i>
+                            <input type="range" 
+                                   class="form-range" 
+                                   min="0" 
+                                   max="100" 
+                                   :value="volume" 
+                                   @input="setVolume($event.target.value)"
+                                   title="Громкость (↑ / ↓)">
+                        </div>
+                    </div>
+                    <div class="col-5 text-end">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-glass dropdown-toggle w-100 text-start" 
+                                    type="button" 
+                                    data-bs-toggle="dropdown" 
+                                    aria-expanded="false">
+                                <i class="bi bi-moon-stars me-2"></i>
+                                Сон: <strong>{{ sleepTimerMinutes > 0 ? sleepTimerMinutes + ' мин' : 'Выкл' }}</strong>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end glass-card border-0 p-2 shadow-lg">
+                                <li><a class="dropdown-item rounded py-2" href="#" @click.prevent="startSleepTimer(0)">Выключить таймер</a></li>
+                                <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
+                                <li><a class="dropdown-item rounded py-2" href="#" @click.prevent="startSleepTimer(15)">15 минут</a></li>
+                                <li><a class="dropdown-item rounded py-2" href="#" @click.prevent="startSleepTimer(30)">30 минут</a></li>
+                                <li><a class="dropdown-item rounded py-2" href="#" @click.prevent="startSleepTimer(60)">60 минут</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0" style="border-color: var(--glass-border);">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="search" 
+                               class="form-control bg-transparent border-start-0" 
+                               style="border-color: var(--glass-border);" 
+                               v-model="searchQuery" 
+                               placeholder="Поиск станций...">
+                        <button class="btn" 
+                                :class="showFavoritesOnly ? 'btn-warning' : 'btn-glass'" 
+                                @click="showFavoritesOnly = !showFavoritesOnly" 
+                                title="Показывать только избранные">
+                            <i class="bi" :class="showFavoritesOnly ? 'bi-star-fill' : 'bi-star'"></i>
+                        </button>
+                    </div>
+                </div>
+				
+                <div v-if="error" class="alert alert-danger py-2 small d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ error }}
+                </div>
+
+                <div class="station-list" style="max-height: 320px; overflow-y: auto; padding-right: 4px;">
+                    <div v-if="isLoading && stations.length === 0" class="text-center py-5 text-muted">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <div class="small mt-3">Загрузка списка станций...</div>
+                    </div>
+                    
+                    <div v-else-if="filteredStations.length === 0" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                        <div class="small">Станции не найдены</div>
+                    </div>
+
+                    <div v-for="station in filteredStations" 
+                         :key="station.url" 
+                         class="station-item p-3 d-flex align-items-center justify-content-between"
+                         :class="{ active: station.originalIndex === currentStationIndex }"
+                         @click="playStation(station.originalIndex)">
+                        
+                        <div class="d-flex align-items-center gap-3 overflow-hidden flex-grow-1">
+                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" 
+                                 style="width: 42px; height: 42px; flex-shrink: 0;">
+                                <i class="bi bi-music-note-beamed fs-5"></i>
+                            </div>
+                            <div class="text-truncate">
+                                <div class="fw-semibold text-truncate">{{ station.name }}</div>
+                                <div class="small text-muted" style="font-size: 0.75rem;">Нажмите для воспроизведения</div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                            <span v-if="station.originalIndex === currentStationIndex && isPlaying" class="text-primary">
+                                <i class="bi bi-soundwave fs-5"></i>
+                            </span>
+                            <button class="btn btn-sm btn-link text-decoration-none p-2" 
+                                    :class="isFavorite(station.url) ? 'text-warning' : 'text-muted opacity-50'"
+                                    @click.stop="toggleFavorite(station.url)"
+                                    :title="isFavorite(station.url) ? 'Удалить из избранного' : 'Добавить в избранное'">
+                                <i class="bi fs-5" :class="isFavorite(station.url) ? 'bi-star-fill' : 'bi-star'"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="text-center mt-3 text-white-50 small">
+                <span>Используйте <kbd class="bg-white bg-opacity-10 border border-white border-opacity-20 rounded px-1">Пробел</kbd> для Play/Pause</span>
+            </div>
+        </div>
+    </div>
+
+    <audio ref="audioPlayer" preload="none"></audio>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+    createApp({
+        setup() {
+            const stations = ref([]);
+            const currentStationIndex = ref(-1);
+            const isPlaying = ref(false);
+            const isLoading = ref(false);
+            const volume = ref(parseInt(localStorage.getItem('radioVolume') || '70'));
+            const error = ref(null);
+            const audioPlayer = ref(null);
+            const searchQuery = ref('');
+            const showFavoritesOnly = ref(false);
+            const favorites = ref(JSON.parse(localStorage.getItem('radioFavorites') || '[]'));
+            const sleepTimerMinutes = ref(0);
+            const sleepTimerInterval = ref(null);
+            const theme = ref(localStorage.getItem('radioTheme') || 'dark');
+
+            const currentStation = computed(() => {
+                return currentStationIndex.value >= 0 ? stations.value[currentStationIndex.value] : null;
+            });
+
+            const filteredStations = computed(() => {
+                let result = stations.value.map((station, index) => ({ ...station, originalIndex: index }));
+                
+                if (showFavoritesOnly.value) {
+                    result = result.filter(s => favorites.value.includes(s.url));
+                }
+                
+                const query = searchQuery.value.toLowerCase().trim();
+                if (query) {
+                    result = result.filter(s => s.name.toLowerCase().includes(query));
+                }
+                
+                return result;
+            });
+
+            const volumeIcon = computed(() => {
+                if (volume.value == 0) return 'bi-volume-mute-fill';
+                if (volume.value < 50) return 'bi-volume-down-fill';
+                return 'bi-volume-up-fill';
+            });
+
+            const fallbackStations = [
+                { name: "Record Dance Radio", url: "https://radiorecord.hostingradio.ru/rr_main96.aacp" },
+                { name: "Europa Plus", url: "https://ep128.hostingradio.ru:8030/ep128" },
+                { name: "Наше Радио", url: "https://nashe1.hostingradio.ru/nashe-128.mp3" },
+                { name: "Radio Jazz", url: "https://jazz.hostingradio.ru/jazz128.mp3" },
+                { name: "Relax FM", url: "https://relaxfm.hostingradio.ru/relaxfm128.mp3" },
+                { name: "DFM", url: "https://dfm.hostingradio.ru/dfm96.aacp" },
+                { name: "Радио Маяк", url: "https://mayak.hostingradio.ru/mayak128.mp3" },
+                { name: "Comedy Radio", url: "https://comedy.hostingradio.ru/comedy128.mp3" },
+                { name: "Русский хит", url: "https://listen.rusongs.ru/ru-mp3-128" }
+            ];
+
+            watch(theme, (newTheme) => {
+                document.documentElement.setAttribute('data-bs-theme', newTheme);
+                localStorage.setItem('radioTheme', newTheme);
+            });
+
+            watch([isPlaying, currentStation], () => {
+                if (currentStation.value) {
+                    document.title = isPlaying.value ? `▶ ${currentStation.value.name} | NeonWave` : `⏸ ${currentStation.value.name} | NeonWave`;
+                } else {
+                    document.title = 'NeonWave Radio';
+                }
+            });
+
+            const toggleTheme = () => {
+                theme.value = theme.value === 'dark' ? 'light' : 'dark';
+            };
+
+            const fetchStations = async () => {
+                isLoading.value = true;
+                error.value = null;
+                try {
+                    const response = await fetch('stations.json?t=' + Date.now());
+                    if (!response.ok) throw new Error('HTTP error');
+                    const data = await response.json();
+                    if (!Array.isArray(data)) throw new Error("Invalid format");
+                    stations.value = data;
+                } catch (e) {
+                    console.warn("Использую резервный список станций:", e.message);
+                    stations.value = fallbackStations;
+                } finally {
+                    isLoading.value = false;
+                }
+            };
+
+            const loadStation = (index) => {
+                if (index < 0 || index >= stations.value.length || !audioPlayer.value) return false;
+                const station = stations.value[index];
+                if (audioPlayer.value.currentSrc !== station.url) {
+                    audioPlayer.value.src = station.url;
+                    audioPlayer.value.load();
+                }
+                currentStationIndex.value = index;
+                return true;
+            };
+
+            const playAudio = async () => {
+                if (!audioPlayer.value) return;
+                isLoading.value = true;
+                error.value = null;
+                try {
+                    await audioPlayer.value.play();
+                } catch (e) {
+                    error.value = `Ошибка воспроизведения: ${e.message}`;
+                    isPlaying.value = false;
+                    isLoading.value = false;
+                }
+            };
+
+            const playStation = (index) => {
+                if (index === currentStationIndex.value && isPlaying.value) {
+                    togglePlayPause();
+                    return;
+                }
+                if (loadStation(index)) {
+                    playAudio();
+                }
+            };
+
+            const togglePlayPause = () => {
+                if (!audioPlayer.value || currentStationIndex.value < 0) {
+                    if (stations.value.length > 0) playStation(0);
+                    return;
+                }
+                error.value = null;
+                if (isPlaying.value) {
+                    audioPlayer.value.pause();
+                } else {
+                    if (audioPlayer.value.currentSrc !== currentStation.value.url) {
+                        if (loadStation(currentStationIndex.value)) playAudio();
+                    } else {
+                        playAudio();
+                    }
+                }
+            };
+
+            const nextStation = () => {
+                if (stations.value.length < 2) return;
+                const nextIndex = (currentStationIndex.value + 1) % stations.value.length;
+                playStation(nextIndex);
+            };
+
+            const prevStation = () => {
+                if (stations.value.length < 2) return;
+                const prevIndex = (currentStationIndex.value - 1 + stations.value.length) % stations.value.length;
+                playStation(prevIndex);
+            };
+
+            const setVolume = (value) => {
+                volume.value = parseInt(value, 10);
+                if (audioPlayer.value) audioPlayer.value.volume = volume.value / 100;
+                localStorage.setItem('radioVolume', volume.value.toString());
+            };
+
+            const toggleFavorite = (url) => {
+                const idx = favorites.value.indexOf(url);
+                if (idx > -1) {
+                    favorites.value.splice(idx, 1);
+                } else {
+                    favorites.value.push(url);
+                }
+                localStorage.setItem('radioFavorites', JSON.stringify(favorites.value));
+            };
+
+            const isFavorite = (url) => favorites.value.includes(url);
+
+            const startSleepTimer = (minutes) => {
+                if (sleepTimerInterval.value) clearInterval(sleepTimerInterval.value);
+                sleepTimerMinutes.value = minutes;
+                
+                if (minutes > 0) {
+                    sleepTimerInterval.value = setInterval(() => {
+                        sleepTimerMinutes.value--;
+                        if (sleepTimerMinutes.value <= 0) {
+                            if (isPlaying.value) togglePlayPause();
+                            clearInterval(sleepTimerInterval.value);
+                            sleepTimerInterval.value = null;
+                        }
+                    }, 60000);
+                }
+            };
+
+            const handleKeydown = (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                switch(e.code) {
+                    case 'Space':
+                        e.preventDefault();
+                        togglePlayPause();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        setVolume(Math.min(100, volume.value + 5));
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        setVolume(Math.max(0, volume.value - 5));
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        nextStation();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        prevStation();
+                        break;
+                }
+            };
+
+            onMounted(() => {
+                document.documentElement.setAttribute('data-bs-theme', theme.value);
+                fetchStations();
+                window.addEventListener('keydown', handleKeydown);
+                
+                const player = audioPlayer.value;
+                if (player) {
+                    player.volume = volume.value / 100;
+                    player.addEventListener('play', () => { isPlaying.value = true; isLoading.value = false; });
+                    player.addEventListener('pause', () => { isPlaying.value = false; isLoading.value = false; });
+                    player.addEventListener('waiting', () => { isLoading.value = true; });
+                    player.addEventListener('canplay', () => { if (isPlaying.value) isLoading.value = false; });
+                    player.addEventListener('error', () => {
+                        error.value = "Ошибка потока. Попробуйте другую станцию.";
+                        isPlaying.value = false;
+                        isLoading.value = false;
+                    });
+                }
+            });
+
+            onUnmounted(() => {
+                window.removeEventListener('keydown', handleKeydown);
+                if (sleepTimerInterval.value) clearInterval(sleepTimerInterval.value);
+            });
+
+            return {
+                stations, currentStationIndex, isPlaying, isLoading, volume, error,
+                audioPlayer, searchQuery, showFavoritesOnly, sleepTimerMinutes, theme,
+                currentStation, filteredStations, volumeIcon,
+                toggleTheme, toggleFavorite, isFavorite,
+                playStation, togglePlayPause, nextStation, prevStation, setVolume, startSleepTimer
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
